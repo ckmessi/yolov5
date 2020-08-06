@@ -8,8 +8,8 @@ import torch
 
 from models.experimental import attempt_load, check_img_size
 from utils import torch_utils
-from utils.datasets import letterbox
-from utils.utils import non_max_suppression, scale_coords, xyxy2xywh, plot_one_box
+from utils.utils import scale_coords, xyxy2xywh, plot_one_box
+from yolov5_service_util import letterbox, non_max_suppression
 
 
 class YoloV5Service:
@@ -38,37 +38,25 @@ class YoloV5Service:
         self.agnostic_nms = False
         self.view_img = True
 
-    def detect(self, image_frame):
-        pass
+    def detect(self, img_origin):
 
-    def detect_image_file(self, image_file_path):
-        t0 = time.time()
-        img0 = cv2.imread(image_file_path)
-
-        img = letterbox(img0, new_shape=self.img_size)[0]
-        img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, to 3x416x416
-        img = np.ascontiguousarray(img)
-
-        img = torch.from_numpy(img).to(self.device)
-        img = img.half() if self.half else img.float()  # uint8 to fp16/32
-        img /= 255.0  # 0 - 255 to 0.0 - 1.0
-        if img.ndimension() == 3:
-            img = img.unsqueeze(0)
+        img = self._pre_process_image(img_origin)
 
         t1 = torch_utils.time_synchronized()
         pred = self.model(img, augment=self.augment)[0]
 
         # Apply NMS
-        pred = non_max_suppression(pred, self.conf_threshold, self.iou_threshold, classes=self.classes, agnostic=self.agnostic_nms)
+        pred = non_max_suppression(pred, self.conf_threshold, self.iou_threshold, classes=self.classes,
+                                   agnostic=self.agnostic_nms)
         t2 = torch_utils.time_synchronized()
 
         for i, det in enumerate(pred):
-            gn = torch.tensor(img0.shape)[[1, 0, 1, 0]]
+            gn = torch.tensor(img_origin.shape)[[1, 0, 1, 0]]
             s = ''
             s += '%gx%g ' % img.shape[2:]  # print string
             if det is not None and len(det):
                 # Rescale boxes from img_size to im0 size
-                det[:, :4] = scale_coords(img.shape[2:], det[:, :4], img0.shape).round()
+                det[:, :4] = scale_coords(img.shape[2:], det[:, :4], img_origin.shape).round()
 
                 # Print results
                 for c in det[:, -1].unique():
@@ -81,13 +69,31 @@ class YoloV5Service:
                     print(('%g ' * 5 + '\n') % (cls, *xywh))  # label format
 
                     label = '%s %.2f' % (self.names[int(cls)], conf)
-                    plot_one_box(xyxy, img0, label=label, color=self.colors[int(cls)], line_thickness=3)
+                    plot_one_box(xyxy, img_origin, label=label, color=self.colors[int(cls)], line_thickness=3)
 
         # Stream results
         if self.view_img:
-            cv2.imshow("", img0)
+            cv2.imshow("", img_origin)
             if cv2.waitKey(0) == ord('q'):  # q to quit
                 raise StopIteration
+
+    def detect_image_file(self, image_file_path):
+        img_origin = cv2.imread(image_file_path)
+        return self.detect(img_origin)
+
+    def _pre_process_image(self, img_origin):
+        img = letterbox(img_origin, new_shape=self.img_size)[0]
+        img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, to 3x416x416
+        img = np.ascontiguousarray(img)
+
+        img = torch.from_numpy(img).to(self.device)
+        img = img.half() if self.half else img.float()  # uint8 to fp16/32
+        img /= 255.0  # 0 - 255 to 0.0 - 1.0
+        if img.ndimension() == 3:
+            img = img.unsqueeze(0)
+        return img
+
+
 
 if __name__ == "__main__":
     yolov5_service = YoloV5Service('D:/Data/model/yolov5/yolov5m.pt')
