@@ -1,14 +1,12 @@
 import random
 
-import time
-
 import cv2
 import numpy as np
 import torch
 
-from models.experimental import attempt_load, check_img_size
+from yolov5_models import attempt_load
 from yolov5_service_util import xyxy2xywh, non_max_suppression, scale_coords, plot_one_box, letterbox, select_device, \
-    time_synchronized
+    time_synchronized, check_img_size
 
 
 class BoundingBox:
