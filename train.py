@@ -380,6 +380,12 @@ def train(hyp, tb_writer, opt, device):
                 if (best_fitness == fi) and not final_epoch:
                     torch.save(ckpt, best)
                 del ckpt
+
+                # Save only state_dict
+                state_dict_path = wdir + 'state_dict.pth'
+                state_dict_ckpt = ema.ema.state_dict()
+                torch.save(state_dict_ckpt, state_dict_path)
+
         # end epoch ----------------------------------------------------------------------------------------------------
     # end training
 
