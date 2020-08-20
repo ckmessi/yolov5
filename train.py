@@ -383,7 +383,12 @@ def train(hyp, tb_writer, opt, device):
 
                 # Save only state_dict
                 state_dict_path = wdir + 'state_dict.pth'
-                state_dict_ckpt = ema.ema.state_dict()
+                state_dict_ckpt = {
+                    'epoch': epoch,
+                    'best_fitness': best_fitness,
+                    'state_dict': ema.ema.state_dict(),
+                    'optimizer': None if final_epoch else optimizer.state_dict()
+                }
                 torch.save(state_dict_ckpt, state_dict_path)
 
         # end epoch ----------------------------------------------------------------------------------------------------
